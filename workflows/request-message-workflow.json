@@ -1,0 +1,80 @@
+{
+  "name": "Request Message Workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "chatInput": {
+          "displayName": "Message",
+          "type": "string",
+          "required": true,
+          "typeOptions": {
+            "multipleValues": false
+          }
+        }
+      },
+      "name": "Chat Trigger",
+      "type": "n8n-nodes-base.chatTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Get the input message\nconst message = $input.item.json.message;\n\n// Define the expected format\nconst expectedFormat = `Request type: Service Deployment/Db Script Execution/Config Change\nEnvironment: mt-dev-xyz/mt-dev/mt-stage/mt-prod/eu-prod/mt-dedicated/enterprise hosting\nRelease type: Regular Release/Hotfix/Early Release/Customer Support\nFor Whatsapp_Inbox: Yes/No\nSprint: sprint-xyz\n---\nDetails: \n[details content here]\n---`;\n\n// Check if message contains all required sections\nconst requiredSections = [\n  'Request type:',\n  'Environment:',\n  'Release type:',\n  'For Whatsapp_Inbox:',\n  'Sprint:',\n  'Details:'\n];\n\nlet isValid = true;\nlet missingSections = [];\n\n// Check for missing sections\nfor (const section of requiredSections) {\n  if (!message.includes(section)) {\n    isValid = false;\n    missingSections.push(section);\n  }\n}\n\n// Check for separator\nif (!message.includes('---')) {\n  isValid = false;\n  missingSections.push('separator (---)');\n}\n\nif (!isValid) {\n  return {\n    json: {\n      isValid: false,\n      error: `Invalid format. Missing sections: ${missingSections.join(', ')}.\\n\\nExpected format:\\n${expectedFormat}`\n    }\n  };\n}\n\n// Extract information\nconst lines = message.split('\\n');\nconst result = {\n  request_type: '',\n  environment: '',\n  release_type: '',\n  for_whatsapp_inbox: '',\n  sprint: '',\n  details: ''\n};\n\nfor (let i = 0; i < lines.length; i++) {\n  const line = lines[i].trim();\n  if (line.startsWith('Request type:')) {\n    result.request_type = line.replace('Request type:', '').trim();\n  } else if (line.startsWith('Environment:')) {\n    result.environment = line.replace('Environment:', '').trim();\n  } else if (line.startsWith('Release type:')) {\n    result.release_type = line.replace('Release type:', '').trim();\n  } else if (line.startsWith('For Whatsapp_Inbox:')) {\n    result.for_whatsapp_inbox = line.replace('For Whatsapp_Inbox:', '').trim();\n  } else if (line.startsWith('Sprint:')) {\n    result.sprint = line.replace('Sprint:', '').trim();\n  } else if (line.startsWith('Details:')) {\n    // Get all lines after Details: until the next separator\n    let details = '';\n    i++;\n    while (i < lines.length && !lines[i].includes('---')) {\n      details += lines[i].trim() + '\\n';\n      i++;\n    }\n    result.details = details.trim();\n  }\n}\n\nreturn {\n  json: {\n    isValid: true,\n    data: result\n  }\n};"
+      },
+      "name": "Validate and Parse Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "conditions": [
+            {
+              "value1": "={{ $json.isValid }}",
+              "value2": "true",
+              "operation": "equal"
+            }
+          ]
+        }
+      },
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Chat Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate and Parse Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate and Parse Message": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
